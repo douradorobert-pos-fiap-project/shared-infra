@@ -1,0 +1,84 @@
+name: Infrastructure
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_lambda_cpf_validator_name: ${{ vars.LAMBDA_CPF_VALIDATOR_NAME || 'CpfValidatorTest' }}
+      TF_VAR_existing_iam_role_arn: ${{ vars.EXISTING_IAM_ROLE_ARN || 'arn:aws:iam::264040538379:role/LabRole' }}
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Validate AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: ../scripts/plan-infrastructure.sh -input=false
+
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    env:
+      TF_VAR_lambda_cpf_validator_name: ${{ vars.LAMBDA_CPF_VALIDATOR_NAME || 'CpfValidatorTest' }}
+      TF_VAR_existing_iam_role_arn: ${{ vars.EXISTING_IAM_ROLE_ARN || 'arn:aws:iam::264040538379:role/LabRole' }}
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Validate AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Apply
+        run: ../scripts/apply-infrastructure.sh -auto-approve

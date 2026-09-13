@@ -1,0 +1,115 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "terraform: init",
+      "type": "shell",
+      "command": "terraform",
+      "args": ["init"],
+      "options": {
+        "cwd": "${workspaceFolder}/terraform"
+      },
+      "env": {
+        "AWS_ACCESS_KEY_ID": "${env:AWS_ACCESS_KEY_ID}",
+        "AWS_SECRET_ACCESS_KEY": "${env:AWS_SECRET_ACCESS_KEY}",
+        "AWS_SESSION_TOKEN": "${env:AWS_SESSION_TOKEN}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "terraform: validate",
+      "type": "shell",
+      "command": "terraform",
+      "args": ["validate"],
+      "options": {
+        "cwd": "${workspaceFolder}/terraform"
+      },
+      "env": {
+        "AWS_ACCESS_KEY_ID": "${env:AWS_ACCESS_KEY_ID}",
+        "AWS_SECRET_ACCESS_KEY": "${env:AWS_SECRET_ACCESS_KEY}",
+        "AWS_SESSION_TOKEN": "${env:AWS_SESSION_TOKEN}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "terraform: plan",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/plan-infrastructure.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "env": {
+        "AWS_ACCESS_KEY_ID": "${env:AWS_ACCESS_KEY_ID}",
+        "AWS_SECRET_ACCESS_KEY": "${env:AWS_SECRET_ACCESS_KEY}",
+        "AWS_SESSION_TOKEN": "${env:AWS_SESSION_TOKEN}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "terraform: apply",
+      "type": "shell",
+      "command": "${workspaceFolder}/scripts/apply-infrastructure.sh",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "env": {
+        "AWS_ACCESS_KEY_ID": "${env:AWS_ACCESS_KEY_ID}",
+        "AWS_SECRET_ACCESS_KEY": "${env:AWS_SECRET_ACCESS_KEY}",
+        "AWS_SESSION_TOKEN": "${env:AWS_SESSION_TOKEN}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "terraform: destroy",
+      "type": "shell",
+      "command": "terraform",
+      "args": ["destroy"],
+      "options": {
+        "cwd": "${workspaceFolder}/terraform"
+      },
+      "env": {
+        "AWS_ACCESS_KEY_ID": "${env:AWS_ACCESS_KEY_ID}",
+        "AWS_SECRET_ACCESS_KEY": "${env:AWS_SECRET_ACCESS_KEY}",
+        "AWS_SESSION_TOKEN": "${env:AWS_SESSION_TOKEN}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "terraform: fmt",
+      "type": "shell",
+      "command": "terraform",
+      "args": ["fmt", "-recursive"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

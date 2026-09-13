@@ -1,0 +1,16 @@
+# VS Code settings (contains AWS credentials)
+.vscode/settings.json
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfstate.*.backup
+terraform/.terraform.lock.hcl
+terraform/credentials.auto.tfvars
+
+
+# Lambda build artifacts
+terraform/lambda/authorizer.zip
+terraform/lambda/authorizer/__pycache__/
+terraform/lambda/authorizer/*.pyc
