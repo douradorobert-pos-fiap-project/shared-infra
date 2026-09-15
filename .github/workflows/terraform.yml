@@ -50,5 +50,20 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=../environments/sandbox/terraform.tfvars
 
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
+      - name: Bootstrap EKS and worker nodes
+        run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars -target=aws_eks_cluster.main -target=aws_eks_node_group.main
+
+      - name: Configure EKS kubeconfig
+        working-directory: .
+        run: aws eks update-kubeconfig --name sandbox-eks --region us-east-1
+
+      - name: Sync controller credentials Secret
+        working-directory: .
+        run: scripts/sync-lb-controller-credentials.sh
+
+      - name: Install or update infrastructure and controller
+        run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars
+
+      - name: Apply controller credential references and wait for readiness
+        working-directory: .
+        run: scripts/sync-lb-controller-credentials.sh

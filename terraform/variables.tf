@@ -104,3 +104,9 @@ variable "lb_controller_namespace" {
   type        = string
   default     = "kube-system"
 }
+
+variable "lb_controller_service_account_name" {
+  description = "Kubernetes ServiceAccount used by the AWS Load Balancer Controller"
+  type        = string
+  default     = "aws-load-balancer-controller"
+}

@@ -20,7 +20,9 @@ flowchart LR
 ```
 
 O AWS Load Balancer Controller é instalado por Helm no EKS e permanece como
-componente de infraestrutura do cluster.
+componente de infraestrutura do cluster. Temporariamente, ele usa as
+credenciais da role dos nodes EC2 via IMDSv2. O ServiceAccount
+`kube-system/aws-load-balancer-controller` não possui annotation de IRSA.
 
 ## Serviços provisionados
 
@@ -34,8 +36,12 @@ componente de infraestrutura do cluster.
 | Autenticação | Lambda JWT authorizer, permissão de invocação pelo API Gateway e segredo JWT no Secrets Manager |
 | Observabilidade | CloudWatch Log Group para access logs do API Gateway |
 
-Não são criadas roles IAM neste repositório. EKS, nodes e o authorizer usam
-a role existente indicada por `existing_iam_role_arn`.
+A role existente indicada por `existing_iam_role_arn` continua sendo reutilizada
+por EKS, nodes e o authorizer. A role dos nodes não é modificada por este
+repositório. O controller recebe credenciais temporárias da pipeline por um
+Secret Kubernetes criado em runtime; não cria OIDC Provider, role IRSA, trust
+policy OIDC ou qualquer policy IAM. A ServiceAccount da aplicação `oficina-api`
+não é alterada.
 
 > **Separação de responsabilidades:** As rotas do API Gateway, o namespace da
 > aplicação, Deployments, Services, HPA, ConfigMaps, Secrets e o
@@ -46,8 +52,7 @@ a role existente indicada por `existing_iam_role_arn`.
 
 - Terraform 1.9+
 - AWS: VPC, EKS, ECR, Elastic Load Balancing, API Gateway v2, Lambda, Secrets Manager e CloudWatch
-- Kubernetes e provider Terraform Kubernetes
-- Helm e AWS Load Balancer Controller
+- Kubernetes, Helm e AWS Load Balancer Controller
 - GitHub Actions com credenciais temporárias AWS
 
 ## Pré-requisitos
@@ -56,7 +61,7 @@ a role existente indicada por `existing_iam_role_arn`.
 2. AWS CLI autenticado para a conta de destino.
 3. Uma Lambda CPF existente na conta/região de destino.
 4. Uma role existente com confiança para `eks.amazonaws.com`, `ec2.amazonaws.com` e `lambda.amazonaws.com` (em VocLabs, normalmente `LabRole`).
-5. Permissões AWS para criar os recursos listados acima e `iam:PassRole` para a role existente.
+5. Permissões AWS para criar os recursos listados acima e `iam:PassRole` para a role existente. Nenhuma permissão IAM adicional é necessária para este fluxo de credenciais da pipeline.
 
 ## Configuração por ambiente
 
@@ -84,10 +89,28 @@ Para evitar confirmações interativas:
 ```
 
 O apply é dividido em duas fases: EKS/nodes primeiro (necessário para o
-provider Kubernetes) e depois os demais recursos, incluindo o AWS Load Balancer
+provider Helm) e depois os demais recursos, incluindo o AWS Load Balancer
 Controller (que depende do EKS para o Helm). O node group depende explicitamente
 das associações das tabelas de rota: isso garante que as subnets privadas tenham
 rota via NAT antes de os nós tentarem alcançar a API do EKS.
+
+### Credenciais temporárias do Load Balancer Controller
+
+O node group é EC2 e usa `existing_iam_role_arn` como `node_role_arn`. Seu Launch
+Template mantém `HttpEndpoint = enabled`, exige IMDSv2 (`HttpTokens = required`)
+e define `HttpPutResponseHopLimit = 2`, permitindo que o pod do controller
+consulte o IMDS através da rede do node. O Helm configura `region = us-east-1`,
+usa a ServiceAccount `kube-system/aws-load-balancer-controller` e agenda o
+controller no node group EC2.
+
+Esta é uma mitigação temporária. A solução recomendada é migrar para IRSA ou
+EKS Pod Identity quando a conta tiver as permissões administrativas necessárias.
+Em AWS Academy/VocLabs, as credenciais permanecem válidas somente enquanto a
+sessão durar. Quando `AWS_SESSION_TOKEN` expirar, atualize os três GitHub Secrets
+e execute novamente a pipeline; o Secret será atualizado e o controller será
+reiniciado automaticamente. O patch de ambiente é aplicado depois de cada
+upgrade Helm porque o chart fixado não suporta as três referências `valueFrom`
+necessárias (incluindo o session token) como configuração nativa.
 
 Para usar outro arquivo de variáveis, informe um caminho absoluto:
 

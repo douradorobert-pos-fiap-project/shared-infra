@@ -20,6 +20,16 @@ resource "aws_eks_cluster" "main" {
   }
 }
 
+resource "aws_launch_template" "eks_nodes" {
+  name_prefix = "${var.eks_cluster_name}-nodes-"
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+}
+
 resource "aws_eks_node_group" "main" {
   cluster_name    = aws_eks_cluster.main.name
   node_group_name = "${var.environment}-node-group"
@@ -34,6 +44,11 @@ resource "aws_eks_node_group" "main" {
   }
 
   instance_types = var.eks_node_instance_types
+
+  launch_template {
+    id      = aws_launch_template.eks_nodes.id
+    version = aws_launch_template.eks_nodes.latest_version
+  }
 
   update_config {
     max_unavailable = 1
@@ -95,10 +110,13 @@ resource "helm_release" "aws_lb_controller" {
   set = [
     { name = "clusterName", value = aws_eks_cluster.main.name },
     { name = "serviceAccount.create", value = "true" },
-    { name = "serviceAccount.name", value = "aws-load-balancer-controller" },
+    { name = "serviceAccount.name", value = var.lb_controller_service_account_name },
     { name = "region", value = var.aws_region },
     { name = "vpcId", value = aws_vpc.main.id },
+    { name = "nodeSelector.eks\\.amazonaws\\.com/nodegroup", value = "${var.environment}-node-group" },
   ]
 
-  depends_on = [aws_eks_node_group.main]
+  depends_on = [
+    aws_eks_node_group.main,
+  ]
 }
