@@ -21,12 +21,21 @@ kubectl create secret generic "${secret_name}" \
   -o yaml | kubectl apply -f - >/dev/null
 
 if kubectl get deployment "${deployment_name}" --namespace "${namespace}" >/dev/null 2>&1; then
+  container_name="$(kubectl get deployment "${deployment_name}" \
+    --namespace "${namespace}" \
+    -o jsonpath="{.spec.template.spec.containers[0].name}")"
+
+  if [[ -z "${container_name}" ]]; then
+    echo "Controller deployment has no container name" >&2
+    exit 1
+  fi
+
+  patch="{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"${container_name}\",\"env\":[{\"name\":\"AWS_ACCESS_KEY_ID\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"${secret_name}\",\"key\":\"AWS_ACCESS_KEY_ID\"}}},{\"name\":\"AWS_SECRET_ACCESS_KEY\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"${secret_name}\",\"key\":\"AWS_SECRET_ACCESS_KEY\"}}},{\"name\":\"AWS_SESSION_TOKEN\",\"valueFrom\":{\"secretKeyRef\":{\"name\":\"${secret_name}\",\"key\":\"AWS_SESSION_TOKEN\"}}}]}]}}}}"
+
   kubectl patch deployment "${deployment_name}" \
     --namespace "${namespace}" \
     --type strategic \
-    --patch-file /dev/stdin >/dev/null <<PATCH
-{"spec":{"template":{"spec":{"containers":[{"name":"controller","env":[{"name":"AWS_ACCESS_KEY_ID","valueFrom":{"secretKeyRef":{"name":"aws-load-balancer-controller-credentials","key":"AWS_ACCESS_KEY_ID"}}},{"name":"AWS_SECRET_ACCESS_KEY","valueFrom":{"secretKeyRef":{"name":"aws-load-balancer-controller-credentials","key":"AWS_SECRET_ACCESS_KEY"}}},{"name":"AWS_SESSION_TOKEN","valueFrom":{"secretKeyRef":{"name":"aws-load-balancer-controller-credentials","key":"AWS_SESSION_TOKEN"}}}]}]}}}}
-PATCH
+    --patch "${patch}" >/dev/null
   kubectl rollout restart deployment/"${deployment_name}" --namespace "${namespace}" >/dev/null
   kubectl rollout status deployment/"${deployment_name}" --namespace "${namespace}" --timeout=180s
 fi
