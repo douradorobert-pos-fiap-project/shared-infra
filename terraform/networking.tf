@@ -12,11 +12,24 @@ resource "aws_lb" "app_nlb" {
   }
 }
 
+resource "aws_security_group_rule" "nlb_to_pods" {
+  type              = "ingress"
+  security_group_id = aws_eks_cluster.main.vpc_config[0].cluster_security_group_id
+
+  from_port   = 8000
+  to_port     = 8000
+  protocol    = "tcp"
+  cidr_blocks = var.public_subnet_cidrs
+
+  description = "Allow NLB health checks and traffic to application pods"
+}
+
 resource "aws_lb_target_group" "app" {
-  name     = "${var.environment}-app-tg"
-  port     = 80
-  protocol = "TCP"
-  vpc_id   = aws_vpc.main.id
+  name        = "${var.environment}-app-tg"
+  port        = 80
+  protocol    = "TCP"
+  target_type = "ip"
+  vpc_id      = aws_vpc.main.id
 
   health_check {
     protocol            = "HTTP"
