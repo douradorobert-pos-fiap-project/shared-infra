@@ -17,6 +17,7 @@ jobs:
     env:
       TF_VAR_lambda_cpf_validator_name: ${{ vars.LAMBDA_CPF_VALIDATOR_NAME || 'CpfValidatorTest' }}
       TF_VAR_existing_iam_role_arn: ${{ vars.EXISTING_IAM_ROLE_ARN || 'arn:aws:iam::264040538379:role/LabRole' }}
+      TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     defaults:
       run:
         working-directory: terraform
