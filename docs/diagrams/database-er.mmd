@@ -1,0 +1,55 @@
+erDiagram
+    CLIENTES ||--o{ VEICULOS : possui
+    CLIENTES ||--o{ ORDENS_SERVICO : solicita
+    VEICULOS ||--o{ ORDENS_SERVICO : associado_a
+    ORDENS_SERVICO ||--o{ ITENS_SERVICO : contem
+    ORDENS_SERVICO ||--o{ ITENS_PECA : contem
+    CLIENTES {
+        string id PK
+        string cpf_cnpj UK
+        string nome
+        string email
+        string telefone
+    }
+    VEICULOS {
+        string id PK
+        string cliente_id FK
+        string placa UK
+        string marca
+        string modelo
+    }
+    SERVICOS {
+        string id PK
+        string nome
+        decimal preco_base
+    }
+    PECAS {
+        string id PK
+        string sku UK
+        string nome
+        decimal preco
+        int quantidade_estoque
+    }
+    ORDENS_SERVICO {
+        string id PK
+        string cliente_id FK
+        string veiculo_id FK
+        string status
+        boolean orcamento_aprovado
+        boolean orcamento_recusado
+    }
+    ITENS_SERVICO {
+        string id PK
+        string ordem_servico_id FK
+        string servico_id "sem FK"
+        string nome
+        decimal preco
+    }
+    ITENS_PECA {
+        string id PK
+        string ordem_servico_id FK
+        string peca_id "sem FK"
+        string nome
+        decimal preco_unitario
+        int quantidade
+    }

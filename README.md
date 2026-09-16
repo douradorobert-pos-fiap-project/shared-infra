@@ -11,12 +11,17 @@ O projeto foi preparado para ambientes AWS Academy/VocLabs: reutiliza um
 ```mermaid
 flowchart LR
     client[Cliente HTTP] -->|HTTPS| api[API Gateway HTTP API]
-    api -->|POST /cpf| cpf[Lambda CPF externa]
+    api -->|Integração CPF| cpf[Lambda CPF externa]
     api -->|Rotas protegidas| authorizer[Lambda JWT Authorizer]
     authorizer -->|Lê segredo| secret[Secrets Manager]
     api -->|VPC Link| nlb[Network Load Balancer]
-    nlb -->|Target group IP| app[EKS]
+    nlb -->|Target group IP| eks[EKS e node group]
+    vpc[VPC: subnets públicas e privadas] --> eks
+    vpc --> nlb
+    ecr[ECR: repositórios de imagens] -.->|Imagem da aplicação via deploy externo| eks
+    controller[AWS Load Balancer Controller via Helm] --> eks
     api -->|Access logs| logs[CloudWatch Logs]
+    newrelic[New Relic via Helm] --> eks
 ```
 
 O AWS Load Balancer Controller é instalado por Helm no EKS e permanece como
@@ -54,6 +59,14 @@ não é alterada.
 - AWS: VPC, EKS, ECR, Elastic Load Balancing, API Gateway v2, Lambda, Secrets Manager e CloudWatch
 - Kubernetes, Helm e AWS Load Balancer Controller
 - GitHub Actions com credenciais temporárias AWS
+
+## Documentação das APIs
+
+O API Gateway criado aqui fornece o endpoint HTTP, mas este repositório não gera um Swagger ou uma coleção Postman próprios. Consulte a [documentação das integrações e rotas](docs/api-gateway-routes.md) e o [Swagger da aplicação Oficina](https://github.com/douradorobert-pos-fiap-project/tech-challenge-fiap#documentação-da-api). O endereço do Gateway após o deploy pode ser consultado com `terraform -chdir=terraform output -raw api_gateway_endpoint`; a disponibilidade das rotas depende do deploy da aplicação.
+
+## Documentação da Arquitetura
+
+O [índice da documentação arquitetural](docs/README.md) reúne diagramas Mermaid de componentes, autenticação, ordens de serviço e banco de dados, além dos RFCs e ADRs da solução. Ele distingue os recursos deste repositório dos configurados nos repositórios da aplicação e do RDS.
 
 ## Pré-requisitos
 
