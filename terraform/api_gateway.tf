@@ -108,6 +108,20 @@ resource "aws_apigatewayv2_integration" "nlb_eks" {
   integration_uri        = aws_lb_listener.app.arn
 }
 
+# Application routes. The greedy route preserves the complete request path
+# when API Gateway forwards it through the HTTP_PROXY integration.
+resource "aws_apigatewayv2_route" "application_root" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "ANY /"
+  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+}
+
+resource "aws_apigatewayv2_route" "application_proxy" {
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = "ANY /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+}
+
 # Default Stage
 resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.http_api.id
