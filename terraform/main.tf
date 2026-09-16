@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.4"
     }
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 3.3"
+    }
   }
 
   backend "s3" {

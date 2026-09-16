@@ -110,3 +110,20 @@ variable "lb_controller_service_account_name" {
   type        = string
   default     = "aws-load-balancer-controller"
 }
+
+variable "new_relic_license_key" {
+  description = "New Relic license key supplied through CI/CD"
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(trimspace(var.new_relic_license_key)) > 0
+    error_message = "new_relic_license_key must be provided through CI/CD."
+  }
+}
+
+variable "new_relic_chart_version" {
+  description = "Version of the official New Relic nri-bundle Helm chart"
+  type        = string
+  default     = "8.0.10"
+}

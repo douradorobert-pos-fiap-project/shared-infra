@@ -34,7 +34,7 @@ credenciais da role dos nodes EC2 via IMDSv2. O ServiceAccount
 | Imagens | Repositórios ECR para a aplicação e para o CPF validator, ambos com lifecycle policy |
 | API | API Gateway HTTP API, VPC Link, security group, integração ao NLB e integração à Lambda CPF externa |
 | Autenticação | Lambda JWT authorizer, permissão de invocação pelo API Gateway e segredo JWT no Secrets Manager |
-| Observabilidade | CloudWatch Log Group para access logs do API Gateway |
+| Observabilidade | CloudWatch Log Group para access logs do API Gateway e New Relic Kubernetes via Helm |
 
 A role existente indicada por `existing_iam_role_arn` continua sendo reutilizada
 por EKS, nodes e o authorizer. A role dos nodes não é modificada por este
@@ -162,3 +162,60 @@ terraform -chdir=terraform fmt -check
 terraform -chdir=terraform validate
 pytest tests/test_terraform_static.py -v
 ```
+
+## Monitoring and Observability
+
+O recurso `helm_release.newrelic` instala o chart oficial `nri-bundle` no
+namespace dedicado `newrelic`, depois que o cluster EKS e o node group ficam
+disponíveis. O provider Helm usa o endpoint, o certificado e o token do EKS já
+definidos em `terraform/providers.tf`; não há provider Kubernetes adicional.
+O nome enviado ao New Relic é `aws_eks_cluster.main.name`, portanto o ambiente
+continua identificável pelo nome existente, sem duplicá-lo manualmente.
+
+A instalação habilita o agente de infraestrutura, kube-state-metrics, eventos
+Kubernetes e `newrelic-logging`. Isso permite observar CPU e memória de nodes e
+pods, estado de nodes e pods, Deployments, restarts, workloads indisponíveis,
+eventos e métricas gerais do cluster. O componente de logging fornece o
+encaminhamento dos logs de containers; não altera o código ou o formato dos
+logs da aplicação. A instrumentação APM e métricas de negócio ficam a cargo do
+repositório da aplicação.
+
+### Configuração do GitHub
+
+Adicione o secret `NEW_RELIC_LICENSE_KEY` em **Settings → Secrets and
+variables → Actions → Secrets**. A pipeline o expõe somente ao Terraform como
+`TF_VAR_new_relic_license_key`; ele não é versionado, outputado ou escrito em
+`terraform.tfvars`. Não é necessária GitHub Variable adicional para o New
+Relic. A versão do chart pode ser sobrescrita por uma variável Terraform
+`new_relic_chart_version` quando um ambiente precisar controlar o upgrade.
+
+### Validação no Kubernetes
+
+Após o apply, valide os componentes instalados:
+
+```bash
+kubectl get pods -n newrelic
+kubectl get all -n newrelic
+kubectl get daemonsets,deployments -n newrelic
+kubectl get events -n newrelic --sort-by=.lastTimestamp
+helm status newrelic -n newrelic
+```
+
+Os pods devem estar `Running`/`Ready` e o DaemonSet do agente e do logging
+deve ter um pod pronto por node elegível. Para validar no New Relic, abra
+**Infrastructure → Kubernetes** e procure o cluster pelo valor de
+`terraform output -raw eks_cluster_name`; confirme nodes, workloads e eventos
+recentes. A chegada inicial de dados pode levar alguns minutos.
+
+Para remover e reaplicar somente a integração, use o fluxo normal do state:
+
+```bash
+terraform -chdir=terraform destroy -target=helm_release.newrelic \
+  -var-file=../environments/sandbox/terraform.tfvars
+TF_VAR_new_relic_license_key="$NEW_RELIC_LICENSE_KEY" \
+  ./scripts/apply-infrastructure.sh
+```
+
+Não execute o `destroy` acima sem confirmar o target e as credenciais do
+ambiente. O Terraform state poderá conter dados sensíveis necessários ao
+provider, mas a license key não é exposta em outputs.
