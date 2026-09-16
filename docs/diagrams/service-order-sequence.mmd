@@ -1,0 +1,40 @@
+sequenceDiagram
+    autonumber
+    actor Cliente
+    participant GW as API Gateway HTTP API
+    participant Auth as Lambda authorizer JWT
+    participant Link as VPC Link e NLB
+    participant App as FastAPI no EKS
+    participant UC as AbrirOsUseCase
+    participant DB as PostgreSQL no RDS
+    participant NR as New Relic
+    Cliente->>GW: POST /api/v1/ordens-servico com Bearer e IDs
+    opt Rota protegida vinculada ao authorizer
+        GW->>Auth: Validar JWT HS256
+        Auth-->>GW: Allow ou Deny
+    end
+    opt Rota integrada ao NLB e autorizada
+        GW->>Link: HTTP_PROXY via VPC Link
+        Link->>App: Encaminhar requisição
+        App->>App: Validar JWT em CurrentUserDep e payload Pydantic
+        App->>UC: AbrirOsDTO
+        UC->>DB: Buscar cliente e veículo por ID
+        DB-->>UC: Cliente e veículo ou ausência
+        alt Cliente ou veículo ausente
+            UC-->>App: Erro de domínio
+            App-->>Link: 404
+            Link-->>GW: 404
+            GW-->>Cliente: 404
+        else Ambos encontrados
+            UC->>DB: Buscar serviços e peças informados por ID
+            DB-->>UC: Cadastros encontrados
+            UC->>UC: Calcular orçamento e mudar status para AGUARDANDO_APROVACAO
+            UC->>DB: Salvar ordem e itens em commits separados
+            DB-->>UC: Ordem persistida
+            UC->>NR: Evento ServiceOrderCreated se agente APM ativo
+            UC-->>App: OrdemServicoResponseDTO
+            App-->>Link: 201 e ordem criada
+            Link-->>GW: 201
+            GW-->>Cliente: 201 e ordem criada
+        end
+    end

@@ -1,0 +1,43 @@
+flowchart LR
+    cliente[Cliente]
+    subgraph aws[Serviços AWS]
+        gateway[API Gateway HTTP API]
+        authorizer[Lambda REQUEST authorizer JWT]
+        secret[Secrets Manager: segredo JWT]
+        cpf[Lambda de CPF existente]
+        cw[CloudWatch: access logs JSON]
+        subgraph rede[VPC e entrada]
+            link[VPC Link: subnets privadas]
+            nlb[NLB público: listener TCP 80]
+            tg[Target group: TCP 80 e health check /health]
+        end
+        subgraph eks[Amazon EKS e Kubernetes]
+            controller[AWS Load Balancer Controller]
+            binding[TargetGroupBinding da aplicação]
+            service[Service ClusterIP oficina-api]
+            deploy[Deployment e pods FastAPI]
+            hpa[HPA CPU e memória]
+            metrics[metrics-server]
+            nrcluster[nri-bundle: infraestrutura, eventos e logging]
+        end
+        subgraph banco[Amazon RDS em outro repositório]
+            rds[PostgreSQL privado]
+        end
+    end
+    subgraph obs[Observabilidade externa]
+        nr[New Relic]
+    end
+    cliente --> gateway
+    gateway -->|Rotas protegidas, se vinculadas| authorizer
+    authorizer -->|Lê JWT_SECRET_ARN configurado| secret
+    gateway -->|Integração AWS_PROXY CPF, se houver rota| cpf
+    gateway -->|Access logs| cw
+    gateway -->|HTTP_PROXY| link --> nlb --> tg
+    tg -.->|Registro de alvos depende do binding e compatibilidade de target type| binding
+    controller -.-> binding
+    binding --> service --> deploy
+    metrics --> hpa -->|Ajusta réplicas| deploy
+    deploy -->|DATABASE_URL| rds
+    deploy -.->|Invocação CPF no cadastro de cliente, se configurada| cpf
+    deploy -.->|APM, eventos e logs JSON com correlação| nr
+    nrcluster -.->|Métricas, eventos e logs de containers| nr
