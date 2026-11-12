@@ -18,7 +18,7 @@ resource "aws_apigatewayv2_api" "http_api" {
   cors_configuration {
     allow_origins = var.api_gateway_cors_origins
     allow_methods = ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
-    allow_headers = ["content-type", "authorization", "x-api-key"]
+    allow_headers = ["content-type", "authorization", "x-api-key", "X-Correlation-ID"]
     max_age       = 300
   }
 
@@ -119,6 +119,24 @@ resource "aws_apigatewayv2_route" "application_root" {
 resource "aws_apigatewayv2_route" "application_proxy" {
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = "ANY /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+}
+
+locals {
+  microservice_routes = {
+    os-root         = "ANY /api/v1/service-orders"
+    os-proxy        = "ANY /api/v1/service-orders/{proxy+}"
+    billing-root    = "ANY /api/v1/quotes"
+    billing-proxy   = "ANY /api/v1/quotes/{proxy+}"
+    execution-root  = "ANY /api/v1/executions"
+    execution-proxy = "ANY /api/v1/executions/{proxy+}"
+  }
+}
+
+resource "aws_apigatewayv2_route" "microservice" {
+  for_each  = local.microservice_routes
+  api_id    = aws_apigatewayv2_api.http_api.id
+  route_key = each.value
   target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
 }
 

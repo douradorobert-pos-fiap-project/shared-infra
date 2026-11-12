@@ -127,3 +127,33 @@ variable "new_relic_chart_version" {
   type        = string
   default     = "8.0.10"
 }
+
+variable "enable_messaging" {
+  description = "Create SQS queues and DLQs when the AWS Academy sandbox permits SQS."
+  type        = bool
+  default     = false
+}
+
+variable "sqs_visibility_timeout_seconds" {
+  description = "Visibility timeout for integration-event queues."
+  type        = number
+  default     = 60
+}
+
+variable "sqs_max_receive_count" {
+  description = "Delivery attempts before a message is moved to its DLQ."
+  type        = number
+  default     = 3
+}
+
+variable "enable_execution_dynamodb" {
+  description = "Create the Execution Service DynamoDB table when permitted by the sandbox."
+  type        = bool
+  default     = false
+}
+
+variable "enable_dynamodb_point_in_time_recovery" {
+  description = "Enable DynamoDB PITR outside short-lived sandbox demonstrations."
+  type        = bool
+  default     = false
+}
