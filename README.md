@@ -75,22 +75,20 @@ O [índice da documentação arquitetural](docs/README.md) reúne diagramas Merm
 3. Uma Lambda CPF existente na conta/região de destino.
 4. Uma role existente com confiança para `eks.amazonaws.com`, `ec2.amazonaws.com` e `lambda.amazonaws.com` (em VocLabs, normalmente `LabRole`).
 5. Permissões AWS para criar os recursos listados acima e `iam:PassRole` para a role existente. Nenhuma permissão IAM adicional é necessária para este fluxo de credenciais da pipeline.
+6. Um bucket S3 versionado, criptografado e privado criado antes do primeiro `terraform init`.
 
 ## Configuração por ambiente
 
-O arquivo [environments/sandbox/terraform.tfvars](environments/sandbox/terraform.tfvars) contém os valores padrão do sandbox, inclusive:
-
-- `lambda_cpf_validator_name`
-- `existing_iam_role_arn`
-- `eks_kubernetes_version`
-- tamanhos do node group e CIDRs de rede
-
-Para outra conta, atualize pelo menos o nome da Lambda, o ARN da role existente e as credenciais AWS.
+O arquivo [environments/sandbox/terraform.tfvars](environments/sandbox/terraform.tfvars) contém apenas valores estáveis do sandbox, como versão do Kubernetes, tamanhos do node group e CIDRs de rede. Região, bucket de state, nome do cluster, nome da Lambda e ARN da role são fornecidos por GitHub Variables. As duas zonas de disponibilidade são descobertas na região selecionada.
 
 ## Execução local
 
 ```bash
-terraform -chdir=terraform init
+terraform -chdir=terraform init \
+  -backend-config="bucket=${TF_STATE_BUCKET}" \
+  -backend-config="key=sandbox/terraform.tfstate" \
+  -backend-config="region=${AWS_REGION}" \
+  -backend-config="use_lockfile=true"
 ./scripts/plan-infrastructure.sh
 ./scripts/apply-infrastructure.sh
 ```
@@ -112,7 +110,8 @@ rota via NAT antes de os nós tentarem alcançar a API do EKS.
 O node group é EC2 e usa `existing_iam_role_arn` como `node_role_arn`. Seu Launch
 Template mantém `HttpEndpoint = enabled`, exige IMDSv2 (`HttpTokens = required`)
 e define `HttpPutResponseHopLimit = 2`, permitindo que o pod do controller
-consulte o IMDS através da rede do node. O Helm configura `region = us-east-1`,
+consulte o IMDS através da rede do node. O Helm configura a região recebida em
+`AWS_REGION`,
 usa a ServiceAccount `kube-system/aws-load-balancer-controller` e agenda o
 controller no node group EC2.
 
@@ -133,14 +132,9 @@ TFVARS_FILE=/caminho/para/producao.tfvars ./scripts/apply-infrastructure.sh
 
 ## Provisioning pelo GitHub Actions
 
-A pipeline executa validação e plano em pull requests; em pushes para `main`,
-aplica as duas fases automaticamente.
+A pipeline executa testes estáticos, formatação e validação local em pull requests. Não acessa a AWS no PR e não reage a pushes em `main`. O plan e o apply em duas fases somente executam por `workflow_dispatch`, protegidos pelo environment `sandbox`.
 
-> **State compartilhado:** a configuração atual usa state local. Antes de
-> permitir que o job de apply gerencie um ambiente criado localmente, configure
-> um backend remoto compartilhado (por exemplo, S3) e migre o state com
-> `terraform init -migrate-state`. Sem isso, o runner do GitHub não conhece os
-> recursos já criados e tentará recriá-los.
+> **State compartilhado:** o backend S3 é configurado pelo workflow com a key fixa `sandbox/terraform.tfstate`. O bucket é um pré-requisito externo e não é criado por este Terraform.
 
 Configure estes GitHub Secrets em **Settings → Secrets and variables → Actions → Secrets**:
 
@@ -149,15 +143,19 @@ Configure estes GitHub Secrets em **Settings → Secrets and variables → Actio
 | `AWS_ACCESS_KEY_ID` | Access key da conta de destino |
 | `AWS_SECRET_ACCESS_KEY` | Secret access key da conta de destino |
 | `AWS_SESSION_TOKEN` | Token da sessão temporária |
+| `NEW_RELIC_LICENSE_KEY` | Chave de ingestão fornecida ao chart do New Relic |
 
 Configure estas GitHub Variables em **Settings → Secrets and variables → Actions → Variables**:
 
-| Variable | Descrição | Padrão |
+| Variable | Descrição | Exemplo do sandbox atual |
 | --- | --- | --- |
+| `AWS_REGION` | Região de todos os recursos e do backend | `us-east-1` |
+| `TF_STATE_BUCKET` | Bucket S3 criado no bootstrap | `terraform-state-891377055171-us-east-1` |
 | `LAMBDA_CPF_VALIDATOR_NAME` | Nome da Lambda CPF externa | `CpfValidatorTest` |
-| `EXISTING_IAM_ROLE_ARN` | ARN da role reutilizada pelo EKS e Lambda authorizer | `arn:aws:iam::264040538379:role/LabRole` |
+| `EXISTING_IAM_ROLE_ARN` | ARN da role reutilizada pelo EKS e Lambda authorizer | `arn:aws:iam::891377055171:role/LabRole` |
+| `EKS_CLUSTER_NAME` | Nome do cluster compartilhado | `sandbox-eks` |
 
-As GitHub Variables prevalecem sobre os valores do `terraform.tfvars` na pipeline. Assim, cada conta pode ter Lambda e role próprias sem alterar arquivos versionados.
+As GitHub Variables são passadas ao Terraform sem alterar arquivos versionados. Antes do plan, o workflow verifica conta ativa, role, bucket e Lambda externa.
 
 > Credenciais temporárias expiram. Atualize os três GitHub Secrets quando a sessão VocLabs for renovada.
 

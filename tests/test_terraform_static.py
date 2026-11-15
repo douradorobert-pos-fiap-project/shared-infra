@@ -251,19 +251,22 @@ class TestPipeline(unittest.TestCase):
 
     def test_has_plan_step(self):
         content = (Path(__file__).parent.parent / ".github" / "workflows" / "terraform.yml").read_text()
-        self.assertIn('plan-infrastructure.sh', content)
+        self.assertIn('Terraform Plan', content)
+        self.assertIn('terraform plan', content)
 
     def test_has_apply_step(self):
         content = (Path(__file__).parent.parent / ".github" / "workflows" / "terraform.yml").read_text()
-        self.assertIn('apply-infrastructure.sh', content)
+        self.assertIn('Install or update infrastructure and controller', content)
+        self.assertIn('terraform apply', content)
 
 
 class TestBackend(unittest.TestCase):
     """Test state-management assumptions."""
 
-    def test_no_undeclared_remote_backend(self):
+    def test_declares_partial_remote_backend(self):
         content = (TERRAFORM_DIR / "main.tf").read_text()
-        self.assertNotIn('backend "s3"', content)
+        self.assertIn('backend "s3" {}', content)
+        self.assertNotIn('bucket =', content)
 
 
 class TestFileStructure(unittest.TestCase):
@@ -351,14 +354,13 @@ class TestNoKubernetesResources(unittest.TestCase):
                              f"{tf_file.name} should not contain kubernetes_horizontal_pod_autoscaler")
 
 
-class TestNoApiGatewayRoutes(unittest.TestCase):
-    """Verify no API Gateway routes are defined in infra repository."""
+class TestApiGatewayRoutes(unittest.TestCase):
+    """Verify Phase 4 API Gateway routes are owned by shared infrastructure."""
 
-    def test_no_apigatewayv2_route(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "aws_apigatewayv2_route"', content,
-                             f"{tf_file.name} should not contain api_gateway routes")
+    def test_apigatewayv2_routes_exist(self):
+        content = (TERRAFORM_DIR / "api_gateway.tf").read_text()
+        self.assertIn('resource "aws_apigatewayv2_route"', content)
+        self.assertIn('resource "aws_apigatewayv2_route" "microservice"', content)
 
 
 class TestNoApplicationWorkload(unittest.TestCase):

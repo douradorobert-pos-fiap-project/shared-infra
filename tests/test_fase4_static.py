@@ -69,6 +69,55 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
         all_tf = "\n".join(path.read_text() for path in TF.glob("*.tf"))
         self.assertNotIn('resource "aws_iam_', all_tf)
 
+    def test_backend_and_account_configuration_are_portable(self):
+        main = self.read("main.tf")
+        executable_configuration = "\n".join(
+            path.read_text()
+            for path in (
+                *TF.glob("*.tf"),
+                ROOT / "environments" / "sandbox" / "terraform.tfvars",
+                ROOT / ".github" / "workflows" / "terraform.yml",
+            )
+        )
+
+        self.assertIn('backend "s3" {}', main)
+        self.assertNotIn("terraform-state-", main)
+        self.assertNotIn("264040538379", executable_configuration)
+
+    def test_workflow_validates_prs_and_applies_only_by_manual_dispatch(self):
+        workflow = (ROOT / ".github" / "workflows" / "terraform.yml").read_text()
+
+        self.assertIn("pull_request:", workflow)
+        self.assertIn("workflow_dispatch:", workflow)
+        self.assertNotIn("push:", workflow)
+        self.assertIn("environment: sandbox", workflow)
+        self.assertIn("github.event_name == 'workflow_dispatch'", workflow)
+        self.assertIn("init -backend=false", workflow)
+        self.assertIn('-backend-config="key=sandbox/terraform.tfstate"', workflow)
+
+    def test_workflow_consumes_all_sandbox_variables(self):
+        workflow = (ROOT / ".github" / "workflows" / "terraform.yml").read_text()
+
+        for name in (
+            "AWS_REGION",
+            "TF_STATE_BUCKET",
+            "EXISTING_IAM_ROLE_ARN",
+            "LAMBDA_CPF_VALIDATOR_NAME",
+            "EKS_CLUSTER_NAME",
+        ):
+            self.assertIn(f"vars.{name}", workflow)
+        self.assertIn("scripts/check-fase4-permissions.sh", workflow)
+
+    def test_availability_zones_follow_the_selected_region(self):
+        variables = self.read("variables.tf")
+        vpc = self.read("vpc.tf")
+        tfvars = (ROOT / "environments" / "sandbox" / "terraform.tfvars").read_text()
+
+        self.assertNotIn('variable "availability_zones"', variables)
+        self.assertIn("data.aws_availability_zones.available.names", vpc)
+        self.assertNotIn("us-east-1a", tfvars)
+        self.assertNotIn("us-east-1b", tfvars)
+
 
 if __name__ == "__main__":
     unittest.main()

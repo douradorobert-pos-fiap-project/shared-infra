@@ -10,11 +10,16 @@ Usage:
 import os
 import unittest
 
-import boto3
+
+RUN_INTEGRATION_TESTS = os.environ.get("RUN_INTEGRATION_TESTS") == "true"
+if RUN_INTEGRATION_TESTS:
+    import boto3
+else:
+    boto3 = None
 
 
 @unittest.skipUnless(
-    os.environ.get("RUN_INTEGRATION_TESTS") == "true",
+    RUN_INTEGRATION_TESTS,
     "Set RUN_INTEGRATION_TESTS=true to run integration tests"
 )
 class TestEksClusterIntegration(unittest.TestCase):
@@ -43,7 +48,7 @@ class TestEksClusterIntegration(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    os.environ.get("RUN_INTEGRATION_TESTS") == "true",
+    RUN_INTEGRATION_TESTS,
     "Set RUN_INTEGRATION_TESTS=true to run integration tests"
 )
 class TestApiGatewayIntegration(unittest.TestCase):
@@ -75,7 +80,7 @@ class TestApiGatewayIntegration(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    os.environ.get("RUN_INTEGRATION_TESTS") == "true",
+    RUN_INTEGRATION_TESTS,
     "Set RUN_INTEGRATION_TESTS=true to run integration tests"
 )
 class TestEcrRepositories(unittest.TestCase):
@@ -100,7 +105,7 @@ class TestEcrRepositories(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    os.environ.get("RUN_INTEGRATION_TESTS") == "true",
+    RUN_INTEGRATION_TESTS,
     "Set RUN_INTEGRATION_TESTS=true to run integration tests"
 )
 class TestVpcIntegration(unittest.TestCase):
@@ -125,7 +130,7 @@ class TestVpcIntegration(unittest.TestCase):
 
 
 @unittest.skipUnless(
-    os.environ.get("RUN_INTEGRATION_TESTS") == "true",
+    RUN_INTEGRATION_TESTS,
     "Set RUN_INTEGRATION_TESTS=true to run integration tests"
 )
 class TestPostCpfEndpoint(unittest.TestCase):
