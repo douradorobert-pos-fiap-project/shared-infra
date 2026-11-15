@@ -47,6 +47,12 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
         self.assertIn('name            = "QueueIndex"', content)
         self.assertIn("PAY_PER_REQUEST", content)
 
+    def test_sandbox_enables_distributed_messaging_and_execution_store(self):
+        tfvars = (ROOT / "environments" / "sandbox" / "terraform.tfvars").read_text()
+
+        self.assertIn("enable_messaging          = true", tfvars)
+        self.assertIn("enable_execution_dynamodb = true", tfvars)
+
     def test_api_gateway_has_explicit_routes_for_each_service(self):
         content = self.read("api_gateway.tf")
         for prefix in ("/api/v1/service-orders", "/api/v1/quotes", "/api/v1/executions"):

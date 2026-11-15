@@ -79,7 +79,7 @@ O [índice da documentação arquitetural](docs/README.md) reúne diagramas Merm
 
 ## Configuração por ambiente
 
-O arquivo [environments/sandbox/terraform.tfvars](environments/sandbox/terraform.tfvars) contém apenas valores estáveis do sandbox, como versão do Kubernetes, tamanhos do node group e CIDRs de rede. Região, bucket de state, nome do cluster, nome da Lambda e ARN da role são fornecidos por GitHub Variables. As duas zonas de disponibilidade são descobertas na região selecionada.
+O arquivo [environments/sandbox/terraform.tfvars](environments/sandbox/terraform.tfvars) contém apenas valores estáveis do sandbox, como versão do Kubernetes, tamanhos do node group, CIDRs de rede e a ativação de SQS/DynamoDB exigida pela arquitetura distribuída. Região, bucket de state, nome do cluster, nome da Lambda e ARN da role são fornecidos por GitHub Variables. As duas zonas de disponibilidade são descobertas na região selecionada.
 
 ## Execução local
 

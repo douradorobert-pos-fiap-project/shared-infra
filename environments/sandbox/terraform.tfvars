@@ -8,6 +8,8 @@ eks_desired_node_size    = 2
 eks_min_node_size        = 1
 eks_max_node_size        = 4
 api_gateway_cors_origins = ["*"]
+enable_messaging          = true
+enable_execution_dynamodb = true
 
 # JWT secret ARN - will be populated after initial apply
 jwt_secret_arn = ""
