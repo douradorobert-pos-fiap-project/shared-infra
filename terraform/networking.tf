@@ -25,11 +25,12 @@ resource "aws_security_group_rule" "nlb_to_pods" {
 }
 
 resource "aws_lb_target_group" "app" {
-  name        = "${var.environment}-app-tg"
-  port        = 80
-  protocol    = "TCP"
-  target_type = "ip"
-  vpc_id      = aws_vpc.main.id
+  name                 = "${var.environment}-app-tg"
+  port                 = 80
+  protocol             = "TCP"
+  target_type          = "ip"
+  vpc_id               = aws_vpc.main.id
+  deregistration_delay = 30
 
   health_check {
     protocol            = "HTTP"

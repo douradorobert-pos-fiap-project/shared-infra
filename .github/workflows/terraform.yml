@@ -1,22 +1,54 @@
 name: Infrastructure
 
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
+  validate:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Terraform Format
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init without remote backend
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Static tests
+        working-directory: .
+        run: python3 -m unittest tests.test_fase4_static tests.test_terraform_static -v
+
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: sandbox
     env:
-      TF_VAR_lambda_cpf_validator_name: ${{ vars.LAMBDA_CPF_VALIDATOR_NAME || 'CpfValidatorTest' }}
-      TF_VAR_existing_iam_role_arn: ${{ vars.EXISTING_IAM_ROLE_ARN || 'arn:aws:iam::264040538379:role/LabRole' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+      EXISTING_IAM_ROLE_ARN: ${{ vars.EXISTING_IAM_ROLE_ARN }}
+      LAMBDA_CPF_VALIDATOR_NAME: ${{ vars.LAMBDA_CPF_VALIDATOR_NAME }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+      TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+      TF_VAR_lambda_cpf_validator_name: ${{ vars.LAMBDA_CPF_VALIDATOR_NAME }}
+      TF_VAR_existing_iam_role_arn: ${{ vars.EXISTING_IAM_ROLE_ARN }}
+      TF_VAR_eks_cluster_name: ${{ vars.EKS_CLUSTER_NAME }}
       TF_VAR_new_relic_license_key: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     defaults:
       run:
@@ -34,16 +66,19 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
+          aws-region: ${{ vars.AWS_REGION }}
 
-      - name: Validate AWS identity
-        run: aws sts get-caller-identity
+      - name: Validate sandbox permissions and prerequisites
+        working-directory: .
+        run: bash scripts/check-fase4-permissions.sh
 
-      - name: Terraform Format
-        run: terraform fmt -check -recursive
-
-      - name: Terraform Init
-        run: terraform init
+      - name: Terraform Init with remote state
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${TF_STATE_BUCKET}" \
+            -backend-config="key=sandbox/terraform.tfstate" \
+            -backend-config="region=${AWS_REGION}" \
+            -backend-config="use_lockfile=true"
 
       - name: Terraform Validate
         run: terraform validate
@@ -56,7 +91,7 @@ jobs:
 
       - name: Configure EKS kubeconfig
         working-directory: .
-        run: aws eks update-kubeconfig --name sandbox-eks --region us-east-1
+        run: aws eks update-kubeconfig --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}"
 
       - name: Sync controller credentials Secret
         working-directory: .

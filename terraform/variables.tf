@@ -1,7 +1,11 @@
 variable "aws_region" {
   description = "AWS region for all resources"
   type        = string
-  default     = "us-east-1"
+
+  validation {
+    condition     = can(regex("^[a-z]{2}(-gov)?-[a-z]+-[0-9]+$", var.aws_region))
+    error_message = "aws_region must be a valid AWS region name."
+  }
 }
 
 variable "environment" {
@@ -14,12 +18,6 @@ variable "vpc_cidr" {
   description = "CIDR block for the VPC"
   type        = string
   default     = "10.0.0.0/16"
-}
-
-variable "availability_zones" {
-  description = "List of availability zones"
-  type        = list(string)
-  default     = ["us-east-1a", "us-east-1b"]
 }
 
 variable "public_subnet_cidrs" {
@@ -37,7 +35,6 @@ variable "private_subnet_cidrs" {
 variable "eks_cluster_name" {
   description = "Name of the EKS cluster"
   type        = string
-  default     = "sandbox-eks"
 }
 
 variable "eks_kubernetes_version" {
@@ -73,13 +70,11 @@ variable "eks_max_node_size" {
 variable "lambda_cpf_validator_name" {
   description = "Name of the existing CPF validator Lambda function"
   type        = string
-  default     = "CpfValidatorTest"
 }
 
 variable "existing_iam_role_arn" {
   description = "ARN of the existing LabRole used by EKS, worker nodes, and the Lambda authorizer"
   type        = string
-  default     = "arn:aws:iam::264040538379:role/LabRole"
 
   validation {
     condition     = can(regex("^arn:[^:]+:iam::[0-9]{12}:role/.+$", var.existing_iam_role_arn))
@@ -126,4 +121,34 @@ variable "new_relic_chart_version" {
   description = "Version of the official New Relic nri-bundle Helm chart"
   type        = string
   default     = "8.0.10"
+}
+
+variable "enable_messaging" {
+  description = "Create SQS queues and DLQs when the AWS Academy sandbox permits SQS."
+  type        = bool
+  default     = false
+}
+
+variable "sqs_visibility_timeout_seconds" {
+  description = "Visibility timeout for integration-event queues."
+  type        = number
+  default     = 60
+}
+
+variable "sqs_max_receive_count" {
+  description = "Delivery attempts before a message is moved to its DLQ."
+  type        = number
+  default     = 3
+}
+
+variable "enable_execution_dynamodb" {
+  description = "Create the Execution Service DynamoDB table when permitted by the sandbox."
+  type        = bool
+  default     = false
+}
+
+variable "enable_dynamodb_point_in_time_recovery" {
+  description = "Enable DynamoDB PITR outside short-lived sandbox demonstrations."
+  type        = bool
+  default     = false
 }

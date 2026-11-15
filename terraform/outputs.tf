@@ -113,3 +113,23 @@ output "vpc_link_id" {
   description = "VPC Link ID"
   value       = aws_apigatewayv2_vpc_link.main.id
 }
+
+output "microservice_ecr_repository_urls" {
+  description = "Immutable ECR repository URLs keyed by microservice repository name."
+  value       = { for name, repository in aws_ecr_repository.microservice : name => repository.repository_url }
+}
+
+output "service_queue_urls" {
+  description = "SQS integration-event queue URLs keyed by service."
+  value       = { for service, queue in aws_sqs_queue.service : service => queue.url }
+}
+
+output "service_dlq_urls" {
+  description = "SQS dead-letter queue URLs keyed by service."
+  value       = { for service, queue in aws_sqs_queue.dlq : service => queue.url }
+}
+
+output "execution_dynamodb_table_name" {
+  description = "Execution Service DynamoDB table name, or null when disabled."
+  value       = try(aws_dynamodb_table.execution[0].name, null)
+}
