@@ -32,7 +32,7 @@ jobs:
 
       - name: Static tests
         working-directory: .
-        run: python3 -m unittest tests.test_fase4_static tests.test_terraform_static -v
+        run: python3 -m unittest tests.test_fase4_static tests.test_terraform_static tests.test_eks_access_entry_migration -v
 
   deploy:
     needs: validate
