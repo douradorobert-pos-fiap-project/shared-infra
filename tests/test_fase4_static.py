@@ -91,13 +91,18 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
         self.assertIn('resource "aws_eks_access_entry" "nodes"', content)
         self.assertIn('principal_arn = var.existing_iam_role_arn', content)
         self.assertIn('type          = "EC2"', content)
-        self.assertIn('user_name     = "system:node:{{SessionName}}"', content)
-        self.assertRegex(content, r"ignore_changes\s*=\s*\[type\]")
+        self.assertNotIn('user_name     = "system:node:{{SessionName}}"', content)
+        self.assertRegex(
+            content,
+            r"ignore_changes\s*=\s*\[type, user_name, kubernetes_groups\]",
+        )
         self.assertIn("user_data = base64encode", content)
         self.assertIn("InstanceIdNodeName: true", content)
         self.assertIn("aws_eks_access_entry.nodes", content)
         self.assertTrue(adoption_script.exists())
         self.assertIn("terraform -chdir=terraform import", adoption_script.read_text())
+        self.assertIn("aws eks update-access-entry", adoption_script.read_text())
+        self.assertIn("system:node:{{SessionName}}", adoption_script.read_text())
         cluster_step = workflow.index("Update EKS authentication mode")
         adoption_step = workflow.index("Adopt EKS managed node access entry")
         workers_step = workflow.index("Bootstrap EKS worker nodes")
