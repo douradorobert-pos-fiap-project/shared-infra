@@ -86,8 +86,15 @@ jobs:
       - name: Terraform Plan
         run: terraform plan -out=tfplan -var-file=../environments/sandbox/terraform.tfvars
 
-      - name: Bootstrap EKS and worker nodes
-        run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars -target=aws_eks_cluster.main -target=aws_eks_node_group.main
+      - name: Update EKS authentication mode
+        run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars -target=aws_eks_cluster.main
+
+      - name: Adopt EKS managed node access entry
+        working-directory: .
+        run: scripts/adopt-eks-node-access-entry.sh
+
+      - name: Bootstrap EKS worker nodes
+        run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars -target=aws_eks_access_entry.nodes -target=aws_eks_node_group.main
 
       - name: Configure EKS kubeconfig
         working-directory: .

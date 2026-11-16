@@ -83,15 +83,26 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
 
     def test_eks_nodes_bootstrap_without_describe_instances_permission(self):
         content = self.read("eks.tf")
+        workflow = (ROOT / ".github" / "workflows" / "terraform.yml").read_text()
+        adoption_script = ROOT / "scripts" / "adopt-eks-node-access-entry.sh"
 
         self.assertRegex(content, r'authentication_mode\s*=\s*"API_AND_CONFIG_MAP"')
         self.assertRegex(content, r"bootstrap_cluster_creator_admin_permissions\s*=\s*true")
         self.assertIn('resource "aws_eks_access_entry" "nodes"', content)
         self.assertIn('principal_arn = var.existing_iam_role_arn', content)
         self.assertIn('type          = "EC2"', content)
+        self.assertIn('user_name     = "system:node:{{SessionName}}"', content)
+        self.assertRegex(content, r"ignore_changes\s*=\s*\[type\]")
         self.assertIn("user_data = base64encode", content)
         self.assertIn("InstanceIdNodeName: true", content)
         self.assertIn("aws_eks_access_entry.nodes", content)
+        self.assertTrue(adoption_script.exists())
+        self.assertIn("terraform -chdir=terraform import", adoption_script.read_text())
+        cluster_step = workflow.index("Update EKS authentication mode")
+        adoption_step = workflow.index("Adopt EKS managed node access entry")
+        workers_step = workflow.index("Bootstrap EKS worker nodes")
+        self.assertLess(cluster_step, adoption_step)
+        self.assertLess(adoption_step, workers_step)
 
     def test_backend_and_account_configuration_are_portable(self):
         main = self.read("main.tf")
