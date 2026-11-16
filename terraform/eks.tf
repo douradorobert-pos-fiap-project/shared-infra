@@ -3,6 +3,10 @@ resource "aws_eks_cluster" "main" {
   role_arn = var.existing_iam_role_arn
   version  = var.eks_kubernetes_version
 
+  access_config {
+    authentication_mode = "API_AND_CONFIG_MAP"
+  }
+
   vpc_config {
     subnet_ids              = concat(aws_subnet.private[*].id, aws_subnet.public[*].id)
     endpoint_private_access = true
@@ -20,8 +24,31 @@ resource "aws_eks_cluster" "main" {
   }
 }
 
+resource "aws_eks_access_entry" "nodes" {
+  cluster_name  = aws_eks_cluster.main.name
+  principal_arn = var.existing_iam_role_arn
+  type          = "EC2"
+}
+
 resource "aws_launch_template" "eks_nodes" {
   name_prefix = "${var.eks_cluster_name}-nodes-"
+
+  user_data = base64encode(<<-EOT
+    MIME-Version: 1.0
+    Content-Type: multipart/mixed; boundary="NODEADM"
+
+    --NODEADM
+    Content-Type: application/node.eks.aws
+
+    ---
+    apiVersion: node.eks.aws/v1alpha1
+    kind: NodeConfig
+    spec:
+      featureGates:
+        InstanceIdNodeName: true
+    --NODEADM--
+  EOT
+  )
 
   metadata_options {
     http_endpoint               = "enabled"
@@ -36,6 +63,7 @@ resource "aws_eks_node_group" "main" {
   node_role_arn   = var.existing_iam_role_arn
   subnet_ids      = aws_subnet.private[*].id
   capacity_type   = "ON_DEMAND"
+  ami_type        = "AL2023_x86_64_STANDARD"
 
   scaling_config {
     desired_size = var.eks_desired_node_size
@@ -67,6 +95,7 @@ resource "aws_eks_node_group" "main" {
   # endpoint during bootstrap.  Make the NAT path explicit so a targeted EKS
   # apply also creates the public and private route associations first.
   depends_on = [
+    aws_eks_access_entry.nodes,
     aws_route_table_association.public,
     aws_route_table_association.private,
   ]
