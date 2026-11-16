@@ -84,7 +84,8 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
     def test_eks_nodes_bootstrap_without_describe_instances_permission(self):
         content = self.read("eks.tf")
 
-        self.assertIn('authentication_mode = "API_AND_CONFIG_MAP"', content)
+        self.assertRegex(content, r'authentication_mode\s*=\s*"API_AND_CONFIG_MAP"')
+        self.assertRegex(content, r"bootstrap_cluster_creator_admin_permissions\s*=\s*true")
         self.assertIn('resource "aws_eks_access_entry" "nodes"', content)
         self.assertIn('principal_arn = var.existing_iam_role_arn', content)
         self.assertIn('type          = "EC2"', content)
