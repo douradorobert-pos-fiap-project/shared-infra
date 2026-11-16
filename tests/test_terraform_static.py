@@ -309,13 +309,7 @@ class TestNoRdsOwnership(unittest.TestCase):
 
 
 class TestNoKubernetesResources(unittest.TestCase):
-    """Verify no Kubernetes resources are managed by infra repository."""
-
-    def test_no_kubernetes_namespace(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_namespace"', content,
-                             f"{tf_file.name} should not contain kubernetes_namespace")
+    """Verify application Kubernetes workloads are not managed here."""
 
     def test_no_kubernetes_deployment(self):
         for tf_file in TERRAFORM_DIR.glob("*.tf"):
@@ -366,11 +360,36 @@ class TestApiGatewayRoutes(unittest.TestCase):
 class TestNoApplicationWorkload(unittest.TestCase):
     """Verify application-specific resources are not managed by infra repository."""
 
-    def test_no_oficina_namespace(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('oficina', content,
-                             f"{tf_file.name} should not reference oficina namespace")
+    def test_shared_oficina_namespace_is_managed_without_workloads(self):
+        namespace_file = TERRAFORM_DIR / "namespace.tf"
+        self.assertTrue(namespace_file.exists())
+        namespace = namespace_file.read_text()
+        providers = (TERRAFORM_DIR / "providers.tf").read_text()
+        main = (TERRAFORM_DIR / "main.tf").read_text()
+
+        self.assertEqual(namespace.count('resource "kubernetes_namespace_v1"'), 1)
+        self.assertIn('resource "kubernetes_namespace_v1" "oficina"', namespace)
+        self.assertIn('name = "oficina"', namespace)
+        self.assertIn('aws_eks_node_group.main', namespace)
+        self.assertIn('kubernetes = {', main)
+        self.assertIn('source  = "hashicorp/kubernetes"', main)
+        self.assertIn('provider "kubernetes"', providers)
+        self.assertIn('command     = "aws"', providers)
+        self.assertIn('args        = ["eks", "get-token"', providers)
+
+    def test_workflow_creates_namespace_before_full_apply(self):
+        workflow = (
+            Path(__file__).parent.parent / ".github" / "workflows" / "terraform.yml"
+        ).read_text()
+        self.assertIn("-target=kubernetes_namespace_v1.oficina", workflow)
+        kubeconfig = workflow.index("Configure EKS kubeconfig")
+        namespace = workflow.index("-target=kubernetes_namespace_v1.oficina")
+        controller = workflow.index("Sync controller credentials Secret")
+        full_apply = workflow.index("Install or update infrastructure and controller")
+
+        self.assertLess(kubeconfig, namespace)
+        self.assertLess(namespace, controller)
+        self.assertLess(controller, full_apply)
 
     def test_no_oficina_api_service(self):
         for tf_file in TERRAFORM_DIR.glob("*.tf"):

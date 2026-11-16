@@ -93,6 +93,9 @@ jobs:
         working-directory: .
         run: aws eks update-kubeconfig --name "${EKS_CLUSTER_NAME}" --region "${AWS_REGION}"
 
+      - name: Provision shared oficina namespace
+        run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars -target=kubernetes_namespace_v1.oficina
+
       - name: Sync controller credentials Secret
         working-directory: .
         run: scripts/sync-lb-controller-credentials.sh

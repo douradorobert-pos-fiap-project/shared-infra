@@ -20,6 +20,7 @@ flowchart LR
     vpc --> nlb
     ecr[ECR: repositórios de imagens] -.->|Imagem da aplicação via deploy externo| eks
     controller[AWS Load Balancer Controller via Helm] --> eks
+    namespace[Namespace compartilhado: oficina] --> eks
     api -->|Access logs| logs[CloudWatch Logs]
     newrelic[New Relic via Helm] --> eks
 ```
@@ -34,7 +35,7 @@ credenciais da role dos nodes EC2 via IMDSv2. O ServiceAccount
 | Área | Serviços e recursos |
 | --- | --- |
 | Rede | VPC, duas subnets públicas, duas privadas, Internet Gateway, NAT Gateway, Elastic IP e tabelas de rota |
-| Containers | Cluster EKS, node group gerenciado, add-ons VPC CNI/CoreDNS/kube-proxy e AWS Load Balancer Controller |
+| Containers | Cluster EKS, node group gerenciado, namespace compartilhado `oficina`, add-ons VPC CNI/CoreDNS/kube-proxy e AWS Load Balancer Controller |
 | Balanço | Network Load Balancer, listener TCP e target group IP |
 | Imagens | Repositórios ECR para a aplicação e para o CPF validator, ambos com lifecycle policy |
 | API | API Gateway HTTP API, VPC Link, security group, integração ao NLB e integração à Lambda CPF externa |
@@ -48,9 +49,10 @@ Secret Kubernetes criado em runtime; não cria OIDC Provider, role IRSA, trust
 policy OIDC ou qualquer policy IAM. A ServiceAccount da aplicação `oficina-api`
 não é alterada.
 
-> **Separação de responsabilidades:** As rotas do API Gateway, o namespace da
-> aplicação, Deployments, Services, HPA, ConfigMaps, Secrets e o
-> `TargetGroupBinding` são gerenciados pelo repositório da aplicação.
+> **Separação de responsabilidades:** O `shared-infra` gerencia somente o
+> namespace compartilhado `oficina`. Deployments, Services, Jobs, HPA,
+> ConfigMaps e Secrets pertencem aos respectivos microsserviços; nenhum
+> workload de aplicação é gerenciado neste repositório.
 > Consulte `docs/api-gateway-routes.md` para detalhes sobre as rotas.
 
 ## Tecnologias
@@ -99,9 +101,10 @@ Para evitar confirmações interativas:
 ./scripts/apply-infrastructure.sh -auto-approve
 ```
 
-O apply é dividido em duas fases: EKS/nodes primeiro (necessário para o
-provider Helm) e depois os demais recursos, incluindo o AWS Load Balancer
-Controller (que depende do EKS para o Helm). O node group depende explicitamente
+O apply é dividido em fases: EKS/nodes primeiro, namespace compartilhado depois
+da configuração do kubeconfig e, por fim, os demais recursos e charts Helm.
+Essa ordem garante que os pipelines de banco e microsserviços encontrem o
+namespace `oficina` mesmo se um chart posterior falhar. O node group depende explicitamente
 das associações das tabelas de rota: isso garante que as subnets privadas tenham
 rota via NAT antes de os nós tentarem alcançar a API do EKS.
 
