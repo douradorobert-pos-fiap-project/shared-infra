@@ -81,6 +81,17 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
         all_tf = "\n".join(path.read_text() for path in TF.glob("*.tf"))
         self.assertNotIn('resource "aws_iam_', all_tf)
 
+    def test_eks_nodes_bootstrap_without_describe_instances_permission(self):
+        content = self.read("eks.tf")
+
+        self.assertIn('authentication_mode = "API_AND_CONFIG_MAP"', content)
+        self.assertIn('resource "aws_eks_access_entry" "nodes"', content)
+        self.assertIn('principal_arn = var.existing_iam_role_arn', content)
+        self.assertIn('type          = "EC2"', content)
+        self.assertIn("user_data = base64encode", content)
+        self.assertIn("InstanceIdNodeName: true", content)
+        self.assertIn("aws_eks_access_entry.nodes", content)
+
     def test_backend_and_account_configuration_are_portable(self):
         main = self.read("main.tf")
         executable_configuration = "\n".join(
