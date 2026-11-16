@@ -78,9 +78,9 @@ resource "aws_ecr_lifecycle_policy" "cpf_validator" {
 
 locals {
   microservice_repositories = toset([
-    "tech-challenge-fiap-os-service",
-    "tech-challenge-fiap-billing-service",
-    "tech-challenge-fiap-execution-service",
+    "os-service",
+    "billing-service",
+    "execution-service",
   ])
 }
 
