@@ -58,13 +58,6 @@ resource "aws_security_group" "vpc_link" {
   name_prefix = "${var.environment}-vpclink-"
   vpc_id      = aws_vpc.main.id
 
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   egress {
     from_port   = 0
     to_port     = 0
@@ -95,17 +88,17 @@ resource "aws_apigatewayv2_integration" "lambda_cpf" {
   integration_uri        = data.aws_lambda_function.cpf_validator.invoke_arn
 }
 
-# NLB Integration (Application via VPC Link)
-resource "aws_apigatewayv2_integration" "nlb_eks" {
+# Internal ALB Integration (Application via VPC Link)
+resource "aws_apigatewayv2_integration" "internal_alb" {
   api_id                 = aws_apigatewayv2_api.http_api.id
   integration_type       = "HTTP_PROXY"
-  description            = "NLB integration for EKS application via VPC Link"
+  description            = "Internal ALB integration for EKS application via VPC Link"
   connection_type        = "VPC_LINK"
   connection_id          = aws_apigatewayv2_vpc_link.main.id
   integration_method     = "ANY"
   payload_format_version = "1.0"
   timeout_milliseconds   = 30000
-  integration_uri        = aws_lb_listener.app.arn
+  integration_uri        = data.aws_lb_listener.internal_alb.arn
 }
 
 # Application routes. The greedy route preserves the complete request path
@@ -113,13 +106,13 @@ resource "aws_apigatewayv2_integration" "nlb_eks" {
 resource "aws_apigatewayv2_route" "application_root" {
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = "ANY /"
-  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.internal_alb.id}"
 }
 
 resource "aws_apigatewayv2_route" "application_proxy" {
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = "ANY /{proxy+}"
-  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.internal_alb.id}"
 }
 
 locals {
@@ -137,7 +130,7 @@ resource "aws_apigatewayv2_route" "microservice" {
   for_each  = local.microservice_routes
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = each.value
-  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.internal_alb.id}"
 }
 
 # Default Stage

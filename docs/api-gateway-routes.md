@@ -5,6 +5,21 @@ Terraform de infraestrutura antes da separação de responsabilidades. As rotas
 foram removidas do `iac-kubernetes` e devem ser recriadas no repositório da
 aplicação.
 
+> **Atualização de roteamento:** o desenho NLB descrito abaixo é histórico. A migração em andamento usa API Gateway → VPC Link → ALB interno gerenciado pelo AWS Load Balancer Controller. Os serviços compartilham o IngressGroup `sandbox-api`; o OS atende `/health`. A fase `finalize` do Terraform remove o NLB legado.
+
+## Ordem para migrar o sandbox
+
+1. Execute o workflow de infraestrutura com `phase=bootstrap`. Ele aplica as tags de descoberta às subnets privadas, cria o security group do ALB e instala o metrics-server. Copie o output `internal_alb_security_group_id`.
+2. Defina `ALB_SECURITY_GROUP_ID` como variável do ambiente `sandbox` nos três repositórios de serviço.
+3. Execute os workflows manuais dos serviços OS, Billing e Execution. Cada deploy aplica seu Ingress ao grupo interno `sandbox-api`.
+4. Aguarde o ALB `sandbox-api-alb` e os respectivos target groups ficarem saudáveis.
+5. Execute o workflow de infraestrutura com `phase=finalize`. Ele atualiza a integração do API Gateway para o listener HTTP do ALB e remove o NLB legado.
+6. Verifique `GET /health` pelo endpoint do API Gateway e confirme que `metrics.k8s.io` está disponível para os HPAs.
+
+O endpoint público pode ficar indisponível brevemente durante a troca da integração.
+
+---
+
 ## Arquitetura Atual
 
 ```text

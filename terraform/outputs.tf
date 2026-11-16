@@ -83,14 +83,9 @@ output "api_gateway_logs_arn" {
   value       = aws_cloudwatch_log_group.api_logs.arn
 }
 
-output "nlb_dns_name" {
-  description = "NLB DNS name for application"
-  value       = aws_lb.app_nlb.dns_name
-}
-
-output "nlb_arn" {
-  description = "NLB ARN"
-  value       = aws_lb.app_nlb.arn
+output "internal_alb_security_group_id" {
+  description = "Security group ID to configure as ALB_SECURITY_GROUP_ID in service repositories"
+  value       = aws_security_group.internal_alb.id
 }
 
 output "jwt_secret_arn" {
