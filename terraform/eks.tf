@@ -29,6 +29,16 @@ resource "aws_eks_access_entry" "nodes" {
   cluster_name  = aws_eks_cluster.main.name
   principal_arn = var.existing_iam_role_arn
   type          = "EC2"
+  user_name     = "system:node:{{SessionName}}"
+
+  # Enabling access entries on an existing managed node group can cause EKS to
+  # create an EC2_LINUX entry before Terraform can create the desired EC2
+  # entry. The deploy workflow adopts that entry. Its immutable type must be
+  # preserved, while Terraform updates the username required by nodeadm's
+  # InstanceIdNodeName feature gate.
+  lifecycle {
+    ignore_changes = [type]
+  }
 }
 
 resource "aws_launch_template" "eks_nodes" {
