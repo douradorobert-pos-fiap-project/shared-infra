@@ -15,11 +15,17 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
     def test_three_independent_microservice_ecr_repositories(self):
         content = self.read("ecr.tf")
         for repository in (
+            '"os-service"',
+            '"billing-service"',
+            '"execution-service"',
+        ):
+            self.assertIn(repository, content)
+        for obsolete_repository in (
             "tech-challenge-fiap-os-service",
             "tech-challenge-fiap-billing-service",
             "tech-challenge-fiap-execution-service",
         ):
-            self.assertIn(repository, content)
+            self.assertNotIn(obsolete_repository, content)
         self.assertIn('image_tag_mutability = "IMMUTABLE"', content)
         self.assertIn("scan_on_push = true", content)
 
