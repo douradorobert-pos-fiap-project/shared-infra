@@ -311,41 +311,37 @@ class TestNoRdsOwnership(unittest.TestCase):
 class TestNoKubernetesResources(unittest.TestCase):
     """Verify application Kubernetes workloads are not managed here."""
 
-    def test_no_kubernetes_deployment(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_deployment"', content,
-                             f"{tf_file.name} should not contain kubernetes_deployment")
+    FORBIDDEN_WORKLOADS = (
+        "deployment",
+        "service",
+        "job",
+        "manifest",
+        "config_map",
+        "secret",
+        "horizontal_pod_autoscaler",
+    )
 
-    def test_no_kubernetes_service(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_service', content,
-                             f"{tf_file.name} should not contain kubernetes_service")
+    def test_forbidden_patterns_cover_versioned_provider_resources(self):
+        for workload in self.FORBIDDEN_WORKLOADS:
+            pattern = rf'resource\s+"kubernetes_{workload}(?:_v\d+)?"'
+            for resource_type in (
+                f"kubernetes_{workload}",
+                f"kubernetes_{workload}_v1",
+                f"kubernetes_{workload}_v2",
+            ):
+                self.assertRegex(f'resource "{resource_type}" "example" {{}}', pattern)
 
-    def test_no_kubernetes_manifest(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_manifest"', content,
-                             f"{tf_file.name} should not contain kubernetes_manifest")
-
-    def test_no_kubernetes_configmap(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_config_map"', content,
-                             f"{tf_file.name} should not contain kubernetes_config_map")
-
-    def test_no_kubernetes_secret(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_secret"', content,
-                             f"{tf_file.name} should not contain kubernetes_secret")
-
-    def test_no_horizontal_pod_autoscaler(self):
-        for tf_file in TERRAFORM_DIR.glob("*.tf"):
-            content = tf_file.read_text()
-            self.assertNotIn('resource "kubernetes_horizontal_pod_autoscaler"', content,
-                             f"{tf_file.name} should not contain kubernetes_horizontal_pod_autoscaler")
+    def test_no_application_kubernetes_workloads(self):
+        terraform = "\n".join(
+            tf_file.read_text() for tf_file in TERRAFORM_DIR.glob("*.tf")
+        )
+        for workload in self.FORBIDDEN_WORKLOADS:
+            pattern = rf'resource\s+"kubernetes_{workload}(?:_v\d+)?"'
+            self.assertNotRegex(
+                terraform,
+                pattern,
+                f"shared-infra must not manage Kubernetes {workload} resources",
+            )
 
 
 class TestApiGatewayRoutes(unittest.TestCase):
@@ -364,10 +360,17 @@ class TestNoApplicationWorkload(unittest.TestCase):
         namespace_file = TERRAFORM_DIR / "namespace.tf"
         self.assertTrue(namespace_file.exists())
         namespace = namespace_file.read_text()
+        terraform = "\n".join(
+            tf_file.read_text() for tf_file in TERRAFORM_DIR.glob("*.tf")
+        )
         providers = (TERRAFORM_DIR / "providers.tf").read_text()
         main = (TERRAFORM_DIR / "main.tf").read_text()
 
-        self.assertEqual(namespace.count('resource "kubernetes_namespace_v1"'), 1)
+        namespace_resources = re.findall(
+            r'resource\s+"kubernetes_namespace(?:_v\d+)?"\s+"([^"]+)"',
+            terraform,
+        )
+        self.assertEqual(namespace_resources, ["oficina"])
         self.assertIn('resource "kubernetes_namespace_v1" "oficina"', namespace)
         self.assertIn('name = "oficina"', namespace)
         self.assertIn('aws_eks_node_group.main', namespace)
@@ -376,6 +379,8 @@ class TestNoApplicationWorkload(unittest.TestCase):
         self.assertIn('provider "kubernetes"', providers)
         self.assertIn('command     = "aws"', providers)
         self.assertIn('args        = ["eks", "get-token"', providers)
+        self.assertIn('aws_eks_cluster.main.name', providers)
+        self.assertIn('var.aws_region', providers)
 
     def test_workflow_creates_namespace_before_full_apply(self):
         workflow = (
