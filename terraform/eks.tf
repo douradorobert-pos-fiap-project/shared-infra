@@ -150,3 +150,18 @@ resource "helm_release" "aws_lb_controller" {
     aws_eks_node_group.main,
   ]
 }
+
+resource "helm_release" "metrics_server" {
+  name       = "metrics-server"
+  repository = "https://kubernetes-sigs.github.io/metrics-server/"
+  chart      = "metrics-server"
+  version    = "3.13.0"
+  namespace  = "kube-system"
+  timeout    = 600
+
+  set = [
+    { name = "replicas", value = "2" },
+  ]
+
+  depends_on = [aws_eks_node_group.main]
+}

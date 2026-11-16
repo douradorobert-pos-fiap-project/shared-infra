@@ -36,9 +36,11 @@ resource "aws_subnet" "private" {
   availability_zone = local.availability_zones[count.index]
 
   tags = {
-    Name        = "${var.environment}-private-${local.availability_zones[count.index]}"
-    Environment = var.environment
-    Type        = "private"
+    Name                                            = "${var.environment}-private-${local.availability_zones[count.index]}"
+    Environment                                     = var.environment
+    Type                                            = "private"
+    "kubernetes.io/role/internal-elb"               = "1"
+    "kubernetes.io/cluster/${var.eks_cluster_name}" = "shared"
   }
 }
 

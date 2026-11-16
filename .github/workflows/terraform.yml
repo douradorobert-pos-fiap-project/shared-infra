@@ -4,6 +4,13 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      phase:
+        description: "bootstrap: prepare subnets, ALB security group, metrics-server; finalize: route API Gateway to the ALB"
+        type: choice
+        options: [bootstrap, finalize]
+        default: bootstrap
+        required: true
 
 permissions:
   contents: read
@@ -84,6 +91,7 @@ jobs:
         run: terraform validate
 
       - name: Terraform Plan
+        if: inputs.phase == 'finalize'
         run: terraform plan -out=tfplan -var-file=../environments/sandbox/terraform.tfvars
 
       - name: Update EKS authentication mode
@@ -108,7 +116,21 @@ jobs:
         run: scripts/sync-lb-controller-credentials.sh
 
       - name: Install or update infrastructure and controller
+        if: inputs.phase == 'finalize'
         run: terraform apply -auto-approve -var-file=../environments/sandbox/terraform.tfvars
+
+      - name: Bootstrap internal ALB prerequisites
+        if: inputs.phase == 'bootstrap'
+        run: >-
+          terraform apply -auto-approve
+          -var-file=../environments/sandbox/terraform.tfvars
+          -target=aws_subnet.private
+          -target=aws_security_group.internal_alb
+          -target=helm_release.metrics_server
+
+      - name: Publish ALB security group value for service workflow variables
+        if: inputs.phase == 'bootstrap'
+        run: terraform output -raw internal_alb_security_group_id
 
       - name: Apply controller credential references and wait for readiness
         working-directory: .

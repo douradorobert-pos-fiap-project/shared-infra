@@ -60,6 +60,13 @@ class TestVpcNetworking(unittest.TestCase):
         self.assertIn('resource "aws_subnet" "public"', content)
         self.assertIn('resource "aws_subnet" "private"', content)
 
+    def test_private_subnets_are_discoverable_by_internal_alb_controller(self):
+        content = (TERRAFORM_DIR / "vpc.tf").read_text()
+        self.assertIn('"kubernetes.io/role/internal-elb"', content)
+        self.assertIn('"kubernetes.io/cluster/${var.eks_cluster_name}"', content)
+        self.assertIn('= "1"', content)
+        self.assertIn('= "shared"', content)
+
     def test_internet_gateway_defined(self):
         content = (TERRAFORM_DIR / "vpc.tf").read_text()
         self.assertIn('aws_internet_gateway', content)
@@ -119,6 +126,11 @@ class TestEksCluster(unittest.TestCase):
         self.assertIn('coredns', content)
         self.assertIn('kube-proxy', content)
 
+    def test_metrics_server_is_installed_for_hpa_metrics(self):
+        content = (TERRAFORM_DIR / "eks.tf").read_text()
+        self.assertIn('resource "helm_release" "metrics_server"', content)
+        self.assertIn('chart      = "metrics-server"', content)
+
     def test_eks_outputs_defined(self):
         content = (TERRAFORM_DIR / "outputs.tf").read_text()
         self.assertIn('eks_cluster_name', content)
@@ -159,6 +171,21 @@ class TestApiGateway(unittest.TestCase):
         content = (TERRAFORM_DIR / "outputs.tf").read_text()
         self.assertIn('api_gateway_id', content)
         self.assertIn('api_gateway_endpoint', content)
+
+    def test_http_proxy_integrates_with_controller_managed_internal_alb(self):
+        content = (TERRAFORM_DIR / "api_gateway.tf").read_text()
+        self.assertIn('data.aws_lb_listener.internal_alb.arn', content)
+        self.assertNotIn('aws_lb_listener.app.arn', content)
+        networking = (TERRAFORM_DIR / "networking.tf").read_text()
+        self.assertNotIn('resource "aws_lb" "app_nlb"', networking)
+        self.assertIn('resource "aws_security_group" "internal_alb"', networking)
+
+    def test_terraform_workflow_stages_alb_bootstrap_before_final_routing(self):
+        workflow = (Path(__file__).parent.parent / ".github" / "workflows" / "terraform.yml").read_text()
+        self.assertIn("options: [bootstrap, finalize]", workflow)
+        self.assertIn("-target=aws_security_group.internal_alb", workflow)
+        self.assertIn("terraform output -raw internal_alb_security_group_id", workflow)
+        self.assertIn("if: inputs.phase == 'finalize'", workflow)
 
 
 class TestLambdaPermission(unittest.TestCase):
