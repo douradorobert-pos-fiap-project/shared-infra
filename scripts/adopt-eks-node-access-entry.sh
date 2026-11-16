@@ -62,10 +62,18 @@ fi
 
 echo "Replacing incompatible EC2_LINUX access entry and empty managed node group"
 
-terraform -chdir=terraform apply \
-  -auto-approve \
+replacement_plan="$(mktemp "${TMPDIR:-/tmp}/eks-node-replacement.XXXXXX.tfplan")"
+trap 'rm -f "${replacement_plan}"' EXIT
+
+terraform -chdir=terraform plan \
   -var-file=../environments/sandbox/terraform.tfvars \
   -target=aws_eks_access_entry.nodes \
   -target=aws_eks_node_group.main \
   -replace=aws_eks_access_entry.nodes \
-  -replace=aws_eks_node_group.main
+  -replace=aws_eks_node_group.main \
+  -out="${replacement_plan}"
+
+terraform -chdir=terraform show -json "${replacement_plan}" \
+  | python3 scripts/validate-eks-replacement-plan.py
+
+terraform -chdir=terraform apply -auto-approve "${replacement_plan}"
