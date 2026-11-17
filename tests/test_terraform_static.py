@@ -176,6 +176,8 @@ class TestApiGateway(unittest.TestCase):
         content = (TERRAFORM_DIR / "api_gateway.tf").read_text()
         self.assertIn('data.aws_lb_listener.internal_alb.arn', content)
         self.assertNotIn('aws_lb_listener.app.arn', content)
+        self.assertIn('resource "aws_apigatewayv2_integration" "nlb_eks"', content)
+        self.assertNotIn('aws_apigatewayv2_integration.internal_alb.id', content)
         networking = (TERRAFORM_DIR / "networking.tf").read_text()
         self.assertNotIn('resource "aws_lb" "app_nlb"', networking)
         self.assertIn('resource "aws_security_group" "internal_alb"', networking)

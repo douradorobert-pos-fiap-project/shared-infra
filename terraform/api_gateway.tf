@@ -88,8 +88,9 @@ resource "aws_apigatewayv2_integration" "lambda_cpf" {
   integration_uri        = data.aws_lambda_function.cpf_validator.invoke_arn
 }
 
-# Internal ALB Integration (Application via VPC Link)
-resource "aws_apigatewayv2_integration" "internal_alb" {
+# Keep the historical Terraform address so the existing integration is updated
+# in place while API Gateway routes still reference its integration ID.
+resource "aws_apigatewayv2_integration" "nlb_eks" {
   api_id                 = aws_apigatewayv2_api.http_api.id
   integration_type       = "HTTP_PROXY"
   description            = "Internal ALB integration for EKS application via VPC Link"
@@ -106,13 +107,13 @@ resource "aws_apigatewayv2_integration" "internal_alb" {
 resource "aws_apigatewayv2_route" "application_root" {
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = "ANY /"
-  target    = "integrations/${aws_apigatewayv2_integration.internal_alb.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
 }
 
 resource "aws_apigatewayv2_route" "application_proxy" {
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = "ANY /{proxy+}"
-  target    = "integrations/${aws_apigatewayv2_integration.internal_alb.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
 }
 
 locals {
@@ -130,7 +131,7 @@ resource "aws_apigatewayv2_route" "microservice" {
   for_each  = local.microservice_routes
   api_id    = aws_apigatewayv2_api.http_api.id
   route_key = each.value
-  target    = "integrations/${aws_apigatewayv2_integration.internal_alb.id}"
+  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
 }
 
 # Default Stage
