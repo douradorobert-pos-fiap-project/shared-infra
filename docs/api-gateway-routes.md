@@ -1,5 +1,7 @@
 # Rotas do API Gateway - Documentação
 
+> **Estado atual (2026-11):** a fonte de verdade das rotas é `terraform/api_gateway.tf`, em `local.application_routes`. Esta página contém abaixo material histórico de uma arquitetura anterior; não use a lista histórica para inferir as rotas atualmente publicadas.
+
 Este arquivo documenta todas as rotas do API Gateway que foram implementadas no
 Terraform de infraestrutura antes da separação de responsabilidades. As rotas
 foram removidas do `iac-kubernetes` e devem ser recriadas no repositório da
@@ -23,28 +25,26 @@ O endpoint público pode ficar indisponível brevemente durante a troca da integ
 ## Arquitetura Atual
 
 ```text
-Cliente HTTP
+Clientes e notificações Mercado Pago
     │
     ▼
-API Gateway HTTP API (${var.environment}-api)
+API Gateway HTTP API público (${var.environment}-api)
     │
-    ├─ Rota GET /health ──────────────────────────────┐
-    ├─ Rota POST /api/v1/auth/login ──────────────────┤
-    ├─ Rota GET /api/v1/public/ordens-servico/... ────┤  → VPC Link
-    ├─ Rota GET /api/v1/auth/me ──────────────────────┤    │
-    ├─ Rota ANY /api/v1/clientes/{proxy+} ────────────┤    ▼
-    ├─ Rota ANY /api/v1/veiculos/{proxy+} ────────────┤  NLB (TCP:80)
-    ├─ Rota ANY /api/v1/servicos/{proxy+} ────────────┤    │
-    ├─ Rota ANY /api/v1/pecas/{proxy+} ───────────────┤    ▼
-    └─ Rota ANY /api/v1/ordens-servico/{proxy+} ──────┘  Target Group
-                                                            │
-                                                            ▼
-                                                     EKS (oficina-api)
-    │
-    └─ Rota POST /cpf ──────────────────────────────────────┐
-                                                            ▼
-                                                    Lambda CPF Validator
+    ├─ GET /health
+    ├─ Rotas de negócio explícitas (autorização atual: NONE)
+    └─ POST /api/v1/webhooks/mercado-pago (HMAC validado pelo Billing)
+            │
+            ▼
+       VPC Link
+            │
+            ▼
+       ALB interno (sandbox-api-alb)
+            │
+            ▼
+       Ingresses dos microsserviços no EKS
 ```
+
+Não há rota raiz `ANY /` nem rota curinga `ANY /{proxy+}`. A allowlist reduz os caminhos publicados, mas as rotas de negócio continuam sem autenticação de usuário nesta alteração. O endpoint de webhook valida `x-signature` no Billing; o ALB permanece interno.
 
 ## Recursos Compartilhados (permanecem no iac-kubernetes)
 

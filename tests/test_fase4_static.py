@@ -1,5 +1,6 @@
 """Static Phase 4 infrastructure contracts; no AWS credentials required."""
 
+import re
 import unittest
 from pathlib import Path
 
@@ -59,10 +60,44 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
         self.assertIn("enable_messaging          = true", tfvars)
         self.assertIn("enable_execution_dynamodb = true", tfvars)
 
-    def test_api_gateway_has_explicit_routes_for_each_service(self):
+    def test_api_gateway_uses_method_specific_allowlist_without_catch_all(self):
         content = self.read("api_gateway.tf")
-        for prefix in ("/api/v1/service-orders", "/api/v1/quotes", "/api/v1/executions"):
-            self.assertIn(prefix, content)
+        routes = (
+            "GET /health",
+            "POST /api/v1/customers",
+            "POST /api/v1/vehicles",
+            "POST /api/v1/service-orders",
+            "GET /api/v1/service-orders/{order_id}",
+            "GET /api/v1/service-orders/{order_id}/history",
+            "POST /api/v1/catalog-items",
+            "POST /api/v1/quotes",
+            "GET /api/v1/quotes/{quote_id}",
+            "POST /api/v1/quotes/{quote_id}/approval",
+            "POST /api/v1/webhooks/mercado-pago",
+            "POST /api/v1/executions/diagnosis",
+            "POST /api/v1/executions/{execution_id}/diagnosis/complete",
+            "POST /api/v1/executions/{execution_id}/queue",
+            "GET /api/v1/executions/queue",
+            "GET /api/v1/executions/by-order/{order_id}",
+            "POST /api/v1/executions/{execution_id}/repair/start",
+            "POST /api/v1/executions/{execution_id}/repair/complete",
+            "POST /api/v1/executions/{execution_id}/repair/fail",
+            "POST /api/v1/executions/{execution_id}/cancel",
+            "GET /api/v1/executions/{execution_id}",
+        )
+        routes_block = content.split("application_routes = {", 1)[1].split(
+            "\n  }", 1
+        )[0]
+        configured_routes = set(
+            re.findall(r'=\s*"([A-Z]+ /[^"]+)"', routes_block)
+        )
+        self.assertEqual(configured_routes, set(routes))
+
+        self.assertNotIn('"ANY /"', content)
+        self.assertNotIn('"ANY /{proxy+}"', content)
+        self.assertNotIn("{proxy+}", content)
+        self.assertEqual(content.count('resource "aws_apigatewayv2_route"'), 1)
+        self.assertIn('authorization_type = "NONE"', content)
         self.assertIn("X-Correlation-ID", content)
 
     def test_phase4_outputs_do_not_expose_secrets(self):
