@@ -379,7 +379,9 @@ class TestApiGatewayRoutes(unittest.TestCase):
     def test_apigatewayv2_routes_exist(self):
         content = (TERRAFORM_DIR / "api_gateway.tf").read_text()
         self.assertIn('resource "aws_apigatewayv2_route"', content)
-        self.assertIn('resource "aws_apigatewayv2_route" "microservice"', content)
+        self.assertIn('resource "aws_apigatewayv2_route" "application"', content)
+        self.assertIn('local.application_routes', content)
+        self.assertIn('"POST /api/v1/webhooks/mercado-pago"', content)
 
 
 class TestNoApplicationWorkload(unittest.TestCase):

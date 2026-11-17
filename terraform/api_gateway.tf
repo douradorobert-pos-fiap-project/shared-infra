@@ -102,36 +102,39 @@ resource "aws_apigatewayv2_integration" "nlb_eks" {
   integration_uri        = data.aws_lb_listener.internal_alb.arn
 }
 
-# Application routes. The greedy route preserves the complete request path
-# when API Gateway forwards it through the HTTP_PROXY integration.
-resource "aws_apigatewayv2_route" "application_root" {
-  api_id    = aws_apigatewayv2_api.http_api.id
-  route_key = "ANY /"
-  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
-}
-
-resource "aws_apigatewayv2_route" "application_proxy" {
-  api_id    = aws_apigatewayv2_api.http_api.id
-  route_key = "ANY /{proxy+}"
-  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
-}
-
 locals {
-  microservice_routes = {
-    os-root         = "ANY /api/v1/service-orders"
-    os-proxy        = "ANY /api/v1/service-orders/{proxy+}"
-    billing-root    = "ANY /api/v1/quotes"
-    billing-proxy   = "ANY /api/v1/quotes/{proxy+}"
-    execution-root  = "ANY /api/v1/executions"
-    execution-proxy = "ANY /api/v1/executions/{proxy+}"
+  application_routes = {
+    health                    = "GET /health"
+    create_customer           = "POST /api/v1/customers"
+    create_vehicle            = "POST /api/v1/vehicles"
+    create_service_order      = "POST /api/v1/service-orders"
+    get_service_order         = "GET /api/v1/service-orders/{order_id}"
+    get_service_order_history = "GET /api/v1/service-orders/{order_id}/history"
+    create_catalog_item       = "POST /api/v1/catalog-items"
+    create_quote              = "POST /api/v1/quotes"
+    get_quote                 = "GET /api/v1/quotes/{quote_id}"
+    decide_quote              = "POST /api/v1/quotes/{quote_id}/approval"
+    mercado_pago_webhook      = "POST /api/v1/webhooks/mercado-pago"
+    start_diagnosis           = "POST /api/v1/executions/diagnosis"
+    complete_diagnosis        = "POST /api/v1/executions/{execution_id}/diagnosis/complete"
+    queue_execution           = "POST /api/v1/executions/{execution_id}/queue"
+    list_execution_queue      = "GET /api/v1/executions/queue"
+    get_execution_by_order    = "GET /api/v1/executions/by-order/{order_id}"
+    start_repair              = "POST /api/v1/executions/{execution_id}/repair/start"
+    complete_repair           = "POST /api/v1/executions/{execution_id}/repair/complete"
+    fail_repair               = "POST /api/v1/executions/{execution_id}/repair/fail"
+    cancel_execution          = "POST /api/v1/executions/{execution_id}/cancel"
+    get_execution             = "GET /api/v1/executions/{execution_id}"
   }
 }
 
-resource "aws_apigatewayv2_route" "microservice" {
-  for_each  = local.microservice_routes
-  api_id    = aws_apigatewayv2_api.http_api.id
-  route_key = each.value
-  target    = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
+resource "aws_apigatewayv2_route" "application" {
+  for_each = local.application_routes
+
+  api_id             = aws_apigatewayv2_api.http_api.id
+  route_key          = each.value
+  authorization_type = "NONE"
+  target             = "integrations/${aws_apigatewayv2_integration.nlb_eks.id}"
 }
 
 # Default Stage
