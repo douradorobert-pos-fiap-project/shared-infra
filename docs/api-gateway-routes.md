@@ -32,6 +32,7 @@ API Gateway HTTP API público (${var.environment}-api)
     │
     ├─ GET /health
     ├─ Rotas de negócio explícitas (autorização atual: NONE)
+    ├─ GET /api/v1/payments/by-order/{order_id} (QR disponível enquanto pendente)
     └─ POST /api/v1/webhooks/mercado-pago (HMAC validado pelo Billing)
             │
             ▼

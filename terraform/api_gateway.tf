@@ -114,6 +114,8 @@ locals {
     create_quote              = "POST /api/v1/quotes"
     get_quote                 = "GET /api/v1/quotes/{quote_id}"
     decide_quote              = "POST /api/v1/quotes/{quote_id}/approval"
+    get_payment_by_order      = "GET /api/v1/payments/by-order/{order_id}"
+    get_payment               = "GET /api/v1/payments/{payment_id}"
     mercado_pago_webhook      = "POST /api/v1/webhooks/mercado-pago"
     start_diagnosis           = "POST /api/v1/executions/diagnosis"
     complete_diagnosis        = "POST /api/v1/executions/{execution_id}/diagnosis/complete"

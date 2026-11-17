@@ -73,6 +73,8 @@ class TestPhase4SharedInfrastructure(unittest.TestCase):
             "POST /api/v1/quotes",
             "GET /api/v1/quotes/{quote_id}",
             "POST /api/v1/quotes/{quote_id}/approval",
+            "GET /api/v1/payments/by-order/{order_id}",
+            "GET /api/v1/payments/{payment_id}",
             "POST /api/v1/webhooks/mercado-pago",
             "POST /api/v1/executions/diagnosis",
             "POST /api/v1/executions/{execution_id}/diagnosis/complete",
